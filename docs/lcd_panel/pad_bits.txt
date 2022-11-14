@@ -1,0 +1,78 @@
+// Pixel data is shifted into the LCD panel over a serial
+// interface. Inside the panel, there's a 480-bit shift register.
+// Some bits correspond to pixels, others cause screen artefacts.
+// The bits causing artefacts are mapped below.
+
+// bitmask for pad bits, 0 = pixel data, 1 = padding
+
+/** Upper part of digits from left to right **/
+// digit 0 upper part, starting from bit 0 (byte 0)
+0b00000001
+0b00000000
+0b00000000
+0b00000000
+0b10000000
+// digit 1 upper part, starting from bit 40 (byte 5)
+0b00000001
+0b00000000
+0b00000000
+0b00000000
+0b10000000
+// digit 2 upper part, starting from bit 80 (byte 10)
+0b00000001
+0b00000000
+0b00000000
+0b00000000
+0b10000000
+// digit 3 upper part, starting from bit 120 (byte 15)
+0b00000001
+0b00000000
+0b00000000
+0b00000000
+0b10000000
+
+/** Lower part of digits from right to left **/
+// digit 3 lower part, starting from bit 160 (byte 20)
+0b00000111
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b11110000
+// digit 2 lower part, starting from bit 240 (byte 30)
+0b00000111
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b11110000
+// digit 1 lower part, starting from bit 320 (byte 40)
+0b00000111
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b11110000
+// digit 0 lower part, starting from bit 400 (byte 50)
+0b00000111
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b00000000
+0b11110000
