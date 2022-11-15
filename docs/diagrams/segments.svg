@@ -2,13 +2,16 @@
 <!-- Created with Inkscape (http://www.inkscape.org/) -->
 
 <svg
-   width="69.974335mm"
-   height="81.264999mm"
-   viewBox="0 0 69.974335 81.264999"
+   width="74mm"
+   height="85mm"
+   viewBox="0 0 74.000001 85"
    version="1.1"
    id="svg5"
    inkscape:version="1.2.1 (9c6d41e410, 2022-07-14, custom)"
    sodipodi:docname="segments.svg"
+   inkscape:export-filename="segments.png"
+   inkscape:export-xdpi="1000"
+   inkscape:export-ydpi="1000"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -24,9 +27,9 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      showgrid="true"
-     inkscape:zoom="2.1933919"
-     inkscape:cx="120.81744"
-     inkscape:cy="149.99599"
+     inkscape:zoom="1.096696"
+     inkscape:cx="170.51216"
+     inkscape:cy="196.0434"
      inkscape:window-width="1280"
      inkscape:window-height="1367"
      inkscape:window-x="0"
@@ -39,8 +42,8 @@
        units="mm"
        spacingx="1"
        spacingy="1"
-       originx="-22.025667"
-       originy="-79.867498" />
+       originx="-20.000002"
+       originy="-77.999995" />
   </sodipodi:namedview>
   <defs
      id="defs2" />
@@ -48,7 +51,14 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(-22.025668,-79.8675)">
+     transform="translate(-20.000002,-78)">
+    <rect
+       style="fill:#ffffff;stroke:#000000;stroke-width:0.264999;stroke-linejoin:round;stop-color:#000000"
+       id="rect6503"
+       width="73.735001"
+       height="84.735001"
+       x="20.132502"
+       y="78.1325" />
     <g
        id="g12097">
       <rect
@@ -564,13 +574,6 @@
          id="path11751"
          sodipodi:nodetypes="cccccc" />
     </g>
-    <rect
-       style="fill:#666666;stroke:#000000;stroke-width:0.264999;stroke-linecap:butt;stroke-linejoin:round;stroke-dasharray:none;stop-color:#000000"
-       id="rect11874"
-       width="12"
-       height="81"
-       x="153"
-       y="79.5" />
     <text
        xml:space="preserve"
        style="font-size:2.82223px;line-height:1.25;font-family:sans-serif;stroke-width:0.264583"
@@ -1490,7 +1493,7 @@
      inkscape:groupmode="layer"
      id="layer2"
      inkscape:label="annotations"
-     transform="translate(-22.025668,-79.8675)">
+     transform="translate(-20.000002,-78)">
     <g
        id="g50065">
       <text
