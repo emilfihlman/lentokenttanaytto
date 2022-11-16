@@ -12,7 +12,7 @@ UPPER_DIGIT_BITS = 40
 LOWER_DIGIT_BITS = 80
 # see segments.svg for this labeling.
 # note: rect pixel subsegments not in any particular order.
-# also note: that hideous bottom row is not encoded here.
+# also note: that hideous bottom row is encoded here but not included in H to make demo effects easier.
 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = range(15)
 BITS_PER_LABEL = 8
 pixel_map = [
@@ -85,6 +85,13 @@ pixel_map = [
         [(k, 2), (k, 0), (j, 4)],
         [(j, 1)],
         [(i, 5), (i, 4)],
+
+        # 10, but very much unlike the others
+        [(k, 6)],
+        [(j, 7)],
+        [(j, 6)],
+        [(j, 5)],
+        [(j, 0)],
 ]
 
 ser = Serial(argv[1], 115200, exclusive=True, timeout=0)
