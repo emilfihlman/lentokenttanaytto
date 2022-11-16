@@ -2,6 +2,7 @@
 
 from time import sleep
 from serial import Serial
+from sys import argv
 
 W = 5
 H = 10
@@ -86,7 +87,7 @@ pixel_map = [
         [(i, 5), (i, 4)],
 ]
 
-ser = Serial("/dev/ttyACM0", 115200, exclusive=True, timeout=0)
+ser = Serial(argv[1], 115200, exclusive=True, timeout=0)
 sleep(2)
 
 def empty():
