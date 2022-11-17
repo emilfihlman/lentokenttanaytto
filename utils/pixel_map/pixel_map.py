@@ -100,7 +100,7 @@ sleep(2)
 def empty():
     return [0] * BITS
 
-def render_segment(screen, digit, segment, color):
+def render_segment(screen, digit, segment, color=1):
     pix_offset = BITS_PER_LABEL * segment[0] + segment[1]
     if pix_offset < UPPER_DIGIT_BITS:
         # "upper row" but note that some segs are mixed
@@ -113,6 +113,10 @@ def render_segment(screen, digit, segment, color):
 def putpixel(screen, digit, x, y, color=1):
     for segment in pixel_map[y * W + x]:
         render_segment(screen, digit, segment, color)
+
+def putsegments(screen, digit, segments):
+    for segment in segments:
+        render_segment(screen, digit, segment)
 
 def fill(screen):
     for digit in range(DIGITS):
@@ -209,7 +213,26 @@ def blinkydemo():
         display(screen)
         sleep(spf)
 
+def render_p():
+    screen = empty()
+    putsegments(screen, 0, [
+        (e, 2), (e, 1),
+        (e, 4), (e, 5), (e, 6),
+        (f, 4), (f, 5), (f, 6),
+        (g, 2), (g, 4), (g, 5), (g, 1), (g, 3),
+        (m, 6), (m, 7),   (m, 5), (m, 1),   (l, 3), (k, 4), (i, 6),   (h, 2), (h, 3),   (g, 7), (h, 1), (h, 0),
+        (m, 3), (m, 2), (m, 0),   (h, 6), (h, 4), (h, 5),
+        (l, 7), (l, 5),   (i, 1), (i, 0),
+        (l, 1),   (k, 5),   (k, 2), (k, 0), (j, 4),   (j, 1),   (i, 5), (i, 4)
+    ])
+    display(screen)
+    print("80", screen[:80])
+    print("40", screen[-40:])
+    print("rest", screen[80:-40])
+    sleep(99999)
+
 if __name__ == "__main__":
+    render_p()
     while True:
         pixelchasedemo()
         rolldemo()
