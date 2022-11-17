@@ -242,39 +242,48 @@ def render_p():
     print("rest", screen[80:-40])
     sleep(99999)
 
-def splice_glyph_80(screen, digit, bitstring, char_off):
-    p_1_off = 17792
-    nbits1 = 80
-    stride1 = 120
-    replace(screen, digit * 80, bitstring[p_1_off + char_off * stride1:][:nbits1])
+def render_glyph(screen, font, digit, char_off):
+    # careful, these names are inverted
+    stride = LOWER_DIGIT_BITS + UPPER_DIGIT_BITS
+    replace(screen, digit * LOWER_DIGIT_BITS, font[char_off * stride:][:LOWER_DIGIT_BITS])
+    replace(screen, 480 - (digit + 1) * 40, font[char_off * stride + LOWER_DIGIT_BITS:][:UPPER_DIGIT_BITS])
 
-def splice_glyph_40(screen, digit, bitstring, char_off):
-    p_2_off = 17872
-    nbits2 = 40
-    stride2 = 120
-    replace(screen, 480 - (digit + 1) * 40, bitstring[p_2_off + char_off * stride2:][:nbits2])
+def load_font(filename):
+    bytestring = open(filename, 'rb').read()
+    font_base_addr = 0x400 # 1KB
+    glyphs = 256
+    glyphsize = LOWER_DIGIT_BITS + UPPER_DIGIT_BITS
+    font_bytes = bytestring[font_base_addr:font_base_addr + glyphs * glyphsize]
+    return list(expand_bits_msb(font_bytes))
+
+def render_text(screen, font, text):
+    for (digit, ch) in enumerate(text):
+        # this happens to be in ascii order! Plus åäö work out of the box.
+        render_glyph(screen, font, DIGITS - 1 - digit, ord(ch))
 
 def explore_font():
     screen = empty()
-    bytestring = open(argv[2], 'rb').read()
-    bitstring = list(expand_bits_msb(bytestring))
-    for char_off in range(-80, 176-3, 1):
+    font = load_font(argv[2])
+
+    render_text(screen, font, 'Code')
+    display(screen)
+    sleep(1)
+
+    for glyph in range(256 - DIGITS + 1):
         for digit in range(DIGITS):
-            splice_glyph_80(screen, DIGITS - 1 - digit, bitstring, char_off + digit)
-            splice_glyph_40(screen, DIGITS - 1 - digit, bitstring, char_off + digit)
+            render_glyph(screen, font, DIGITS - 1 - digit, glyph + digit)
         display(screen)
-        char_off += 80
-        print(char_off)
-        if char_off < 20:
+        if glyph < 20:
             sleep(0.2)
-        if char_off < 40:
+        if glyph < 40:
             sleep(0.1)
-        elif char_off < 200:
+        elif glyph < 200:
             sleep(0.0)
-        elif char_off < 220:
+        elif glyph < 220:
             sleep(0.1)
         else:
             sleep(0.2)
+
     sleep(9999)
 
 if __name__ == "__main__":
