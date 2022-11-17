@@ -8,6 +8,7 @@ W = 5
 H = 10
 DIGITS = 4
 BITS = 480
+# this is in fact viewed upside down
 UPPER_DIGIT_BITS = 40
 LOWER_DIGIT_BITS = 80
 # see segments.svg for this labeling.
@@ -213,6 +214,16 @@ def blinkydemo():
         display(screen)
         sleep(spf)
 
+def replace(screen, off, pat):
+    for (i, p) in enumerate(pat):
+        screen[off + i] = p
+
+def expand_bits_msb(bytestring):
+    for b in bytestring:
+        for i in range(8):
+            bitval = (0x80 >> i) & b
+            yield 1 if bitval != 0 else 0
+
 def render_p():
     screen = empty()
     putsegments(screen, 0, [
@@ -231,8 +242,43 @@ def render_p():
     print("rest", screen[80:-40])
     sleep(99999)
 
+def splice_glyph_80(screen, digit, bitstring, char_off):
+    p_1_off = 17792
+    nbits1 = 80
+    stride1 = 120
+    replace(screen, digit * 80, bitstring[p_1_off + char_off * stride1:][:nbits1])
+
+def splice_glyph_40(screen, digit, bitstring, char_off):
+    p_2_off = 17872
+    nbits2 = 40
+    stride2 = 120
+    replace(screen, 480 - (digit + 1) * 40, bitstring[p_2_off + char_off * stride2:][:nbits2])
+
+def explore_font():
+    screen = empty()
+    bytestring = open(argv[2], 'rb').read()
+    bitstring = list(expand_bits_msb(bytestring))
+    for char_off in range(-80, 176-3, 1):
+        for digit in range(DIGITS):
+            splice_glyph_80(screen, DIGITS - 1 - digit, bitstring, char_off + digit)
+            splice_glyph_40(screen, DIGITS - 1 - digit, bitstring, char_off + digit)
+        display(screen)
+        char_off += 80
+        print(char_off)
+        if char_off < 20:
+            sleep(0.2)
+        if char_off < 40:
+            sleep(0.1)
+        elif char_off < 200:
+            sleep(0.0)
+        elif char_off < 220:
+            sleep(0.1)
+        else:
+            sleep(0.2)
+    sleep(9999)
+
 if __name__ == "__main__":
-    render_p()
+    explore_font()
     while True:
         pixelchasedemo()
         rolldemo()

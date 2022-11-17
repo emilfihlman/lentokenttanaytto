@@ -8,4 +8,4 @@ TODO: rework the proxy to receive bit per bit to make it eight times faster.
 
 1. Wire up appropriate signals to the LCD
 2. Upload the sketch to an Arduino Uno
-3. ./pixel\_map.py /dev/ttyACM0
+3. ./pixel\_map.py /dev/ttyACM0 ../../rom/lentokenttanaytto\_zel09101.bin
