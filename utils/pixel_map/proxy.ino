@@ -61,26 +61,6 @@ void clear() {
   latch();
 }
 
-void scanPulse(int n) {
-  clear();
-  shiftBit(1);
-  for(int i = 0; i < n-1; i++) {
-    shiftBit(0);
-  }
-  //latch();
-}
-
-void shiftIndex(int n) {
-  for (int i = 0; i < DISPLAY_BITS; i++) {
-    int offset = DISPLAY_BITS - i - 1;
-    if (offset == n) {
-      shiftBit(1);
-    } else {
-      shiftBit(0);
-    }
-  }
-}
-
 void setup() {
   pinMode(LD_PIN, OUTPUT);
   pinMode(CL_PIN, OUTPUT);
@@ -90,19 +70,30 @@ void setup() {
   setupTimer1();
 
   Serial.begin(115200);
+  // Serial.begin(230400);
 
   clear();
 }
 
 int index = 0;
-char incomingByte = 0;
 
 void loop() {
-  incomingByte = Serial.read();
+  int incomingByte = Serial.read();
   if (incomingByte != -1) {
-    shiftBit(incomingByte != 0);
     Serial.write(index); // load-bearing print statement
-    if (++index == 480) {
+    byte compress = 1;
+    if (compress) {
+      byte x = incomingByte;
+      for (byte c = 0; c < 8; c++) {
+        shiftBit((x & 0x80) != 0);
+        x <<= 1;
+      }
+      index += 8;
+    } else {
+      shiftBit(incomingByte != 0);
+      index++;
+    }
+    if (index == 480) {
       latch();
       Serial.write('.');
       index = 0;

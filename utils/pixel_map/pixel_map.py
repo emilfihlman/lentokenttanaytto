@@ -111,8 +111,12 @@ pixel_map = [
         [(b, 5), (b, 6)],
 ]
 
+#ser = Serial(argv[1], 230400, exclusive=True, timeout=0)
 ser = Serial(argv[1], 115200, exclusive=True, timeout=0)
 sleep(2)
+r = ser.read(9999999)
+# wtf arduino
+print("flush size", len(r))
 
 def empty():
     return [0] * BITS
@@ -149,12 +153,45 @@ def fill(screen):
             for seg in pixel:
                 render_segment(screen, digit, seg, 1)
 
+# "big endian"
+def squeeze_bits_be(bytebits):
+    return sum([b << (7 - i) for (i, b) in enumerate(bytebits)])
+
+def bitstring_to_bytestring_be(bitstring):
+    assert (len(bitstring) & 7) == 0
+    nbytes = len(bitstring) // 8
+    for off in range(nbytes):
+        yield squeeze_bits_be(bitstring[8 * off:8 * off + 8])
+
+def unit_test_bitstuff():
+    assert squeeze_bits_be([0, 0, 0, 0, 0, 0, 0, 1]) == 1
+    assert squeeze_bits_be([1, 0, 0, 0, 0, 0, 0, 0]) == 0x80
+    assert squeeze_bits_be([0, 0, 0, 0, 1, 1, 1, 1]) == 0xf
+    assert list(bitstring_to_bytestring_be([
+        0, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 1, 1, 1, 1,
+        ])) == [1, 0x80, 0xf]
+
+unit_test_bitstuff()
+
 def display(screen):
-    print(screen)
-    n = ser.write(bytes(screen))
-    #print(n)
+    compress = True
+    #print(screen)
+    if compress:
+        bs = list(bitstring_to_bytestring_be(screen))
+        assert screen == list(expand_bits_msb(bs))
+        nsent = ser.write(bytes(bs))
+        assert nsent == len(screen) // 8
+    else:
+        nsent = ser.write(bytes(screen))
+        assert nsent == len(screen)
     ser.flush()
-    ser.read(99999)
+    tot = 0
+    while tot < nsent:
+        r = ser.read(9999999)
+        tot += len(r)
+        sleep(0.0001)
 
 def unit_test():
     screen = empty()
@@ -309,7 +346,7 @@ def explore_font():
         if glyph < 40:
             sleep(0.1)
         elif glyph < 200:
-            sleep(0.0)
+            sleep(0.01)
         elif glyph < 220:
             sleep(0.1)
         else:
