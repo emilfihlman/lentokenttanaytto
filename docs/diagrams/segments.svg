@@ -28,8 +28,8 @@
      inkscape:document-units="mm"
      showgrid="true"
      inkscape:zoom="4"
-     inkscape:cx="697.75"
-     inkscape:cy="539.75"
+     inkscape:cx="431"
+     inkscape:cy="311.5"
      inkscape:window-width="2560"
      inkscape:window-height="1367"
      inkscape:window-x="1920"
@@ -659,7 +659,7 @@
          style="font-weight:normal;font-size:2.82696px;stroke-width:0.264584"
          x="66.995781"
          y="92.542801"
-         id="tspan5197">Upper side offset locates byte <tspan
+         id="tspan5197">Lower side offset locates byte <tspan
    style="font-weight:bold;stroke-width:0.264584"
    id="tspan5228">a</tspan></tspan><tspan
          sodipodi:role="line"
@@ -671,7 +671,7 @@
          style="font-weight:normal;font-size:2.82696px;stroke-width:0.264584"
          x="66.995781"
          y="99.610207"
-         id="tspan5212">Lower side offset locates byte <tspan
+         id="tspan5212">Upper side offset locates byte <tspan
    style="font-weight:bold;stroke-width:0.264584"
    id="tspan5230">f</tspan></tspan><tspan
          sodipodi:role="line"
@@ -3016,7 +3016,7 @@
          id="tspan3365"
          style="stroke-width:0.264583"
          x="156"
-         y="174.00002"></tspan></text>
+         y="174.00002" /></text>
     <text
        xml:space="preserve"
        style="font-size:2.82222px;line-height:1.25;font-family:sans-serif;-inkscape-font-specification:'sans-serif, Normal';stroke-width:0.264583"
