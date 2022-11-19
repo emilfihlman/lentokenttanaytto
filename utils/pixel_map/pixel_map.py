@@ -111,12 +111,6 @@ pixel_map = [
         [(b, 5), (b, 6)],
 ]
 
-#ser = Serial(argv[1], 230400, exclusive=True, timeout=0)
-ser = Serial(argv[1], 115200, exclusive=True, timeout=0)
-sleep(2)
-r = ser.read(9999999)
-# wtf arduino
-print("flush size", len(r))
 
 def empty():
     return [0] * BITS
@@ -175,7 +169,7 @@ def unit_test_bitstuff():
 
 unit_test_bitstuff()
 
-def display(screen):
+def display(ser, screen):
     compress = True
     #print(screen)
     if compress:
@@ -203,77 +197,105 @@ def unit_test():
 
 unit_test()
 
+class Display:
+    def __init__(self, port):
+        self.port = port
+
+    def blit(self, window):
+        display(self.port, window.pixels)
+
+class Window:
+    def __init__(self, panels=1):
+        self.panels = panels
+        self.pixels = [0] * (panels * BITS)
+
+    def putpixel(self, digit, x, y, color=1):
+        putpixel(self.pixels, digit, x, y, color)
+
+    def fillx(self, d, y, color=1):
+        for x in range(W):
+            self.putpixel(d, x, y, color)
+
+    def filly(self, d, x, color=1):
+        for y in range(H):
+            self.putpixel(d, x, y, color)
+
+    def fill(self):
+        fill(self.pixels)
+
+class Font:
+    def __init__(self, fw_filename):
+        self.glyphdata = load_font(fw_filename)
+
+    def render(self, window, text):
+        render_text(window.pixels, self.glyphdata, text)
+
+    def render_glyph(self, window, digit, glyph):
+        render_glyph(window.pixels, self.glyphdata, digit, glyph)
+
 def onepixel():
     screen = empty()
     putpixel(screen, 0, 0, 0)
     display(screen)
     sleep(0.5)
 
-def fillx(screen, d, y, color=1):
-    for x in range(W):
-        putpixel(screen, d, x, y, color)
-
-def filly(screen, d, x, color=1):
-    for y in range(H):
-        putpixel(screen, d, x, y, color)
-
-def rolldemo():
+def rolldemo(display):
     spf = 0.02
     # each digit up to down
     for d in range(DIGITS):
         for y in range(H):
-            screen = empty();
-            fillx(screen, d, y)
-            display(screen)
+            window = Window()
+            window.fillx(d, y)
+            display.blit(window)
             sleep(spf/2)
     # each digit left to right
     for d in range(DIGITS):
         for x in range(W):
-            screen = empty();
-            filly(screen, d, x)
-            display(screen)
+            window = Window()
+            window.filly(d, x)
+            display.blit(window)
             sleep(spf)
 
-def flowdemo():
+def flowdemo(display):
     spf = 0.05
-    screen = empty();
+    window = Window()
     # draw and clear top to bottom
     for color in [1, 0]:
         for y in range(H):
             for d in range(DIGITS):
-                fillx(screen, d, y, color)
-            display(screen)
+                window.fillx(d, y, color)
+            display.blit(window)
             sleep(spf)
 
-    screen = empty();
+    window = Window()
     # draw and clear left to right
     for color in [1, 0]:
         for d in range(DIGITS):
             for x in range(W):
-                filly(screen, d, x, color)
-                display(screen)
+                window.filly(d, x, color)
+                display.blit(window)
                 sleep(spf)
 
-def pixelchasedemo():
+def pixelchasedemo(display):
     spf = 0.001
-    screen = empty();
+    window = Window()
     # top to bottom
     for y in range(H):
         # left to right, then right to left
         dir = 1 - ((y & 1) * 2)
         for d in (range(DIGITS)[::dir]):
             for x in range(W)[::dir]:
-                putpixel(screen, d, x, y)
-                display(screen)
+                window.putpixel(d, x, y)
+                display.blit(window)
                 sleep(spf)
 
-def blinkydemo():
+def blinkydemo(display):
     spf = 0.10
     for i in range(20):
-        screen = empty()
+        window = Window()
         if i & 1:
-            fill(screen)
-        display(screen)
+            window.fill()
+        display.blit(window)
         sleep(spf)
 
 def render_p():
@@ -327,20 +349,18 @@ def render_text(screen, font, text):
         # this happens to be in ascii order! Plus åäö work out of the box.
         render_glyph(screen, font, digit, ord(ch))
 
-def explore_font():
-    screen = empty()
-    font = load_font(argv[2])
-
-    render_text(screen, font, 'Code')
-    display(screen)
+def explore_font(display, font):
+    window = Window()
+    font.render(window, 'Code')
+    display.blit(window)
     sleep(1)
 
     for glyph in range(-3, 256 - DIGITS + 1):
-        screen = empty()
+        window = Window()
         for digit in range(DIGITS):
             if glyph + digit >= 0:
-                render_glyph(screen, font, digit, glyph + digit)
-        display(screen)
+                font.render_glyph(window, digit, glyph + digit)
+        display.blit(window)
         if glyph < 20:
             sleep(0.2)
         if glyph < 40:
@@ -354,10 +374,26 @@ def explore_font():
 
     sleep(2)
 
-if __name__ == "__main__":
-    explore_font()
+def main():
+    serial_filename = argv[1]
+    zel09101_fw_filename = argv[2]
+
+    #ser = Serial(argv[1], 230400, exclusive=True, timeout=0)
+    ser = Serial(argv[1], 115200, exclusive=True, timeout=0)
+    sleep(2)
+    r = ser.read(9999999)
+    # wtf arduino
+    print("flush size", len(r))
+
+    font = Font(zel09101_fw_filename)
+
+    display = Display(ser)
+    explore_font(display, font)
     while True:
-        pixelchasedemo()
-        rolldemo()
-        flowdemo()
-        blinkydemo()
+        pixelchasedemo(display)
+        rolldemo(display)
+        flowdemo(display)
+        blinkydemo(display)
+
+if __name__ == "__main__":
+    main()
