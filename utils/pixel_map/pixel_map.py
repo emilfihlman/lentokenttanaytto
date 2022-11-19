@@ -19,6 +19,9 @@ BITS = 480
 # "roughly" because some bits are mixed; a5, b0, d1 and e0 are fed in the bottom data but they are
 # displayed as segments in the top row.
 # See segments.svg for the per-digit arrangement; it also "circles around" the screen.
+#
+# With multiple chained panels, the first bits reach the last one in the chain, which is the
+# rightmost one if data is input to the leftmost one.
 
 UPPER_DIGIT_BITS = 80 # 7 rows including the umlaut region
 LOWER_DIGIT_BITS = 40 # 4 rows
@@ -119,6 +122,10 @@ def render_segment(screen, digit, segment, color=1):
     # the segments were originally specified inverted so invert it back
     pix_offset = 120 - 1 - (BITS_PER_LABEL * segment[0] + segment[1])
 
+    npanels = len(screen) // BITS
+    panel_offset = (npanels - 1 - (digit // 4)) * BITS
+    digit %= 4
+
     if pix_offset < UPPER_DIGIT_BITS:
         # "upper row" but note that some segs are mixed
         # digits go right to left; rightmost digit is clocked in first
@@ -130,7 +137,7 @@ def render_segment(screen, digit, segment, color=1):
         # digits go left to right; leftmost digit is clocked in first
         digit_offset = DIGITS * UPPER_DIGIT_BITS + digit * LOWER_DIGIT_BITS
 
-    screen[digit_offset + pix_offset] = color
+    screen[panel_offset + digit_offset + pix_offset] = color
 
 def putpixel(screen, digit, x, y, color=1):
     skip_highrow_y = 1 + y
@@ -142,7 +149,8 @@ def putsegments(screen, digit, segments):
         render_segment(screen, digit, segment)
 
 def fill(screen):
-    for digit in range(DIGITS):
+    digits = len(screen) // BITS * DIGITS
+    for digit in range(digits):
         for pixel in pixel_map:
             for seg in pixel:
                 render_segment(screen, digit, seg, 1)
@@ -191,15 +199,18 @@ def unit_test():
     screen = empty()
     # segments a1, a2, a3
     putpixel(screen, 3, 4, 6)
-    print(screen)
     # segments a4, a3, a2, a1, a0
     assert screen[-5:] == [0, 1, 1, 1, 0]
 
 unit_test()
 
 class Display:
-    def __init__(self, port):
+    def __init__(self, port, panels=1):
         self.port = port
+        self.panels = panels
+
+    def new_window(self):
+        return Window(self.panels)
 
     def blit(self, window):
         display(self.port, window.pixels)
@@ -240,50 +251,55 @@ def onepixel():
     sleep(0.5)
 
 def rolldemo(display):
-    spf = 0.02
+    spf = 0.04
+    digits = display.panels * DIGITS
     # each digit up to down
-    for d in range(DIGITS):
+    for d in range(digits):
         for y in range(H):
-            window = Window()
+            window = display.new_window()
             window.fillx(d, y)
             display.blit(window)
             sleep(spf/2)
     # each digit left to right
-    for d in range(DIGITS):
+    for d in range(digits):
         for x in range(W):
-            window = Window()
+            window = display.new_window()
             window.filly(d, x)
             display.blit(window)
             sleep(spf)
 
 def flowdemo(display):
     spf = 0.05
-    window = Window()
+    window = display.new_window()
+    digits = display.panels * DIGITS
     # draw and clear top to bottom
     for color in [1, 0]:
         for y in range(H):
-            for d in range(DIGITS):
+            for d in range(digits):
                 window.fillx(d, y, color)
             display.blit(window)
             sleep(spf)
 
-    window = Window()
+    window = display.new_window()
     # draw and clear left to right
     for color in [1, 0]:
-        for d in range(DIGITS):
+        for d in range(digits):
             for x in range(W):
                 window.filly(d, x, color)
                 display.blit(window)
                 sleep(spf)
 
 def pixelchasedemo(display):
-    spf = 0.001
-    window = Window()
+    # experiencing some flicker trouble with a higher rate, likely due to the proxy latching on
+    # every panel.
+    spf = 0.03
+    window = display.new_window()
+    digits = display.panels * DIGITS
     # top to bottom
     for y in range(H):
         # left to right, then right to left
         dir = 1 - ((y & 1) * 2)
-        for d in (range(DIGITS)[::dir]):
+        for d in (range(digits)[::dir]):
             for x in range(W)[::dir]:
                 window.putpixel(d, x, y)
                 display.blit(window)
@@ -292,7 +308,7 @@ def pixelchasedemo(display):
 def blinkydemo(display):
     spf = 0.10
     for i in range(20):
-        window = Window()
+        window = display.new_window()
         if i & 1:
             window.fill()
         display.blit(window)
@@ -321,14 +337,17 @@ def replace(screen, off, pat):
         screen[off + i] = p
 
 def render_glyph(screen, font, digit, char_off):
+    npanels = len(screen) // BITS
+    panel_off = (npanels - 1 - (digit // 4)) * BITS
+    digit %= 4
     stride = UPPER_DIGIT_BITS + LOWER_DIGIT_BITS
     digit_rtl = DIGITS - 1 - digit
     # rightmost digit goes first for top row
     upper_off = digit_rtl * UPPER_DIGIT_BITS
     # leftmost digit goes first for bottom row
     lower_off = DIGITS * UPPER_DIGIT_BITS + digit * LOWER_DIGIT_BITS
-    replace(screen, upper_off, font[char_off * stride:][:UPPER_DIGIT_BITS])
-    replace(screen, lower_off, font[char_off * stride + UPPER_DIGIT_BITS:][:LOWER_DIGIT_BITS])
+    replace(screen, panel_off + upper_off, font[char_off * stride:][:UPPER_DIGIT_BITS])
+    replace(screen, panel_off + lower_off, font[char_off * stride + UPPER_DIGIT_BITS:][:LOWER_DIGIT_BITS])
 
 def expand_bits_msb(bytestring):
     for b in bytestring:
@@ -350,14 +369,19 @@ def render_text(screen, font, text):
         render_glyph(screen, font, digit, ord(ch))
 
 def explore_font(display, font):
-    window = Window()
-    font.render(window, 'Code')
+    window = display.new_window()
+    if display.panels == 1:
+        font.render(window, 'Code')
+    else:
+        font.render(window, 'Longtext')
     display.blit(window)
     sleep(1)
 
-    for glyph in range(-3, 256 - DIGITS + 1):
-        window = Window()
-        for digit in range(DIGITS):
+    width = display.panels * DIGITS
+
+    for glyph in range(-width + 1, 256 - width + 1):
+        window = display.new_window()
+        for digit in range(width):
             if glyph + digit >= 0:
                 font.render_glyph(window, digit, glyph + digit)
         display.blit(window)
@@ -377,6 +401,7 @@ def explore_font(display, font):
 def main():
     serial_filename = argv[1]
     zel09101_fw_filename = argv[2]
+    num_panels = int(argv[3])
 
     #ser = Serial(argv[1], 230400, exclusive=True, timeout=0)
     ser = Serial(argv[1], 115200, exclusive=True, timeout=0)
@@ -387,7 +412,7 @@ def main():
 
     font = Font(zel09101_fw_filename)
 
-    display = Display(ser)
+    display = Display(ser, num_panels)
     explore_font(display, font)
     while True:
         pixelchasedemo(display)
