@@ -30,6 +30,7 @@ BITS = DIGITS * TOTAL_DIGIT_BITS # 480
 W = 5
 H = 10
 # note: rect pixel subsegments not in any particular order.
+# XXX in some particular order, left to right ish or in some render program order to match pixel_gfx
 # note: that hideous top row is encoded here but not included in H to make demo effects easier.
 (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = range(15)
 # a "label" is one of those alphas above
@@ -44,18 +45,18 @@ PIXEL_MAP = [
         [(k, 6)],
 
         # 1
-        [(i, 5), (i, 4)],
+        [(i, 4), (i, 5)],
         [(j, 1)],
-        [(k, 2), (k, 0), (j, 4)],
+        [(j, 4), (k, 0), (k, 2)],
         [(k, 5)],
-        [(l, 2), (l, 1)],
+        [(l, 1), (l, 2)],
 
         # 2
-        [(i, 1), (i, 0)],
-        [(i, 7), (i, 2)],
-        [(k, 1), (j, 3)],
-        [(l, 4), (k, 7)],
-        [(l, 7), (l, 5)],
+        [(i, 0), (i, 1)],
+        [(i, 2), (i, 7)],
+        [(j, 3), (k, 1)],
+        [(k, 7), (l, 4)],
+        [(l, 5), (l, 7)],
 
         # 3
         [(h, 6), (h, 4), (h, 5)],
@@ -246,6 +247,9 @@ class Font:
         font_bytes = bytestring[font_base_addr:][:glyphs * TOTAL_DIGIT_BITS]
         return list(expand_bits_be(font_bytes))
 
+    def get_glyph_data(self, glyph):
+        return self.glyphdata[glyph * TOTAL_DIGIT_BITS:][:TOTAL_DIGIT_BITS]
+
     def render_glyph(self, window, digit, glyph):
         panel_off = (window.panels - 1 - (digit // DIGITS)) * BITS
         panel_digit = digit % DIGITS
@@ -254,10 +258,9 @@ class Font:
         upper_off = panel_digit_rtl * UPPER_DIGIT_BITS
         # leftmost digit goes first for bottom row
         lower_off = DIGITS * UPPER_DIGIT_BITS + panel_digit * LOWER_DIGIT_BITS
-        window.insert_raw(panel_off + upper_off,
-                self.glyphdata[glyph * TOTAL_DIGIT_BITS:][:UPPER_DIGIT_BITS])
-        window.insert_raw(panel_off + lower_off,
-                self.glyphdata[glyph * TOTAL_DIGIT_BITS + UPPER_DIGIT_BITS:][:LOWER_DIGIT_BITS])
+        data = self.get_glyph_data(glyph)
+        window.insert_raw(panel_off + upper_off, data[:UPPER_DIGIT_BITS])
+        window.insert_raw(panel_off + lower_off, data[UPPER_DIGIT_BITS:])
 
     def render(self, window, text):
         for (digit, ch) in enumerate(text):
@@ -320,7 +323,7 @@ def blinkydemo(display):
     spf = 0.10
     for i in range(20):
         window = display.new_window()
-        if i & 1:
+        if (i+1) & 1:
             window.fill()
         display.blit(window)
         sleep(spf)
