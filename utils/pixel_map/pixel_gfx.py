@@ -5,17 +5,29 @@ import pygame.gfxdraw
 import pixel_map
 from time import sleep
 
-# FIXME: this mess is full of off-by-ones like sz vs sz-1
+# FIXME: any off-by-ones?
 
+# emphasis around each segment
 hide_borders = False
+# whatever is in testglyph(), all segments by default
 render_test_glyph = False
+# box around each digit for visualization
+render_regions = True
 
+# guess what this is
+CANVAS_SIZE = (1920, 1080)
+# non-illuminated segment and general screen padding
 COLOR_BACK = (127, 127, 127)
+# illuminated segment
 COLOR_SEG = (255, 255, 255)
+# segment surroundings
 COLOR_SEG_BORDER = (0, 0, 0)
 if hide_borders:
     COLOR_SEG_BORDER = COLOR_SEG
+# box around each digit for visualization
 COLOR_DIGIT_BORDER = (100, 0, 0)
+# digits for each row, determines digit size
+PER_ROW = 32
 
 # "full" and "half" width and height; rectangles in the normal region.
 # normal region goes full half full half full, with varying splits.
@@ -23,7 +35,10 @@ fw = 110
 hw = fw / 2
 h = 90
 
-# top row is special
+DIGIT_GAP_W = fw
+DIGIT_GAP_H = h
+
+# top row region is special
 dots_sz = 80 # height of the row, and width of dot squares
 dots_x = 15 # from left of normal region to left of dots
 dots_yminus = dots_sz + 75 # from top of dots to top of normal region
@@ -35,21 +50,19 @@ middlex = fw + pad + hw + pad + fw/2
 totw = 3 * fw + 2 * hw + 4 * pad
 toth = dots_yminus + 10 * h + 9 * pad
 
-SCALE = 0.104
-
-OFFX = 0
-OFFY = dots_yminus
+# get the nominal values below to make a 32x8 grid
+SCALE = CANVAS_SIZE[0] / (PER_ROW * totw + (PER_ROW-1) * DIGIT_GAP_W)
 
 # again, top row is special
 dots_topx = [
-    dots_x, dots_x + dots_sz,
+    dots_x, dots_x + dots_sz - 1,
     middlex - 55, middlex - 30,
     middlex + 30, middlex + 55,
     totw-1 - dots_x, totw - dots_x - dots_sz,
 ]
 dots_midy = 48
 dots_botx = [
-    dots_x, dots_x + dots_sz,
+    dots_x, dots_x + dots_sz - 1,
     middlex - 106, middlex - 23,
     middlex + 23, middlex + 106,
     totw-1 - dots_x, totw - dots_x - dots_sz,
@@ -60,15 +73,15 @@ TOP_POLYS = [
     [
         (dots_topx[0], 0),
         (dots_topx[1], 0),
-        (dots_topx[1], dots_sz),
-        (dots_topx[0], dots_sz),
+        (dots_topx[1], dots_sz - 1),
+        (dots_topx[0], dots_sz - 1),
     ],
     [
         (dots_topx[2], 0),
         (dots_topx[3], 0),
         (middlex, dots_midy),
-        (dots_botx[3], dots_sz),
-        (dots_botx[2], dots_sz),
+        (dots_botx[3], dots_sz - 1),
+        (dots_botx[2], dots_sz - 1),
     ],
     [
         (dots_topx[3], 0),
@@ -78,214 +91,206 @@ TOP_POLYS = [
     [
         (dots_topx[4], 0),
         (dots_topx[5], 0),
-        (dots_botx[5], dots_sz),
-        (dots_botx[4], dots_sz),
+        (dots_botx[5], dots_sz - 1),
+        (dots_botx[4], dots_sz - 1),
         (middlex, dots_midy),
     ],
     [
         (dots_topx[6], 0),
         (dots_topx[7], 0),
-        (dots_topx[7], dots_sz),
-        (dots_topx[6], dots_sz),
+        (dots_topx[7], dots_sz - 1),
+        (dots_topx[6], dots_sz - 1),
     ],
 ]
-
 
 # "canonical order" consistency rules so that these work together:
 # - PIXEL_MAP specifies segments from left to right, top to bottom
 # - left means the segment faces the left edge of its surrounding box
 # - all left things go first, like in g5..g1
-# - these operations also output things left to right
+# - these stack operations also output things left to right
 # - vertices always go clockwise in a polygon
 # - a polygon always starts from the top left when it matters
 # - triangles are not (yet) split up so they might be inconsistent?
 
 class full:
+    """Emit a full size box"""
     def __call__(self, stack):
         poly = [(0, 0), (fw-1, 0), (fw-1, h-1), (0, h-1)]
         return stack + [poly]
 
 class half:
+    """Emit a half size box"""
     def __call__(self, stack):
         poly = [(0, 0), (hw-1, 0), (hw-1, h-1), (0, h-1)]
         return stack + [poly]
 
 # FIXME all these arcs are approximated by just corners and midpoint,
 # looks good enough from afar but poor when zoomed in
+
 class tl_arc:
-    # expects a rect in the stack
-    # outputs the corner first, then the major part
+    """Split a quad into top-left corner and remaining major part"""
     def __call__(self, stack):
         # midpoint is 1/3 from the nearest corner, roughly
-        rect = stack.pop()
-        midcorner = (1/3. * rect[1][0], 1/3. * rect[3][1])
-        poly1 = [rect[0], rect[1], midcorner, rect[3]]
-        poly2 = [midcorner, rect[1], rect[2], rect[3]]
-        return stack + [poly1, poly2]
+        quad = stack.pop()
+        midvert = (1/3. * quad[1][0], 1/3. * quad[3][1])
+        corner = [quad[0], quad[1], midvert, quad[3]]
+        major = [midvert, quad[1], quad[2], quad[3]]
+        return stack + [corner, major]
 
 class tr_arc:
-    # expects a rect in the stack
-    # outputs the major part first, then the corner
+    """Split a quad into remaining major part and top-right corner"""
     def __call__(self, stack):
         # midpoint is 1/3 from the nearest corner, roughly
-        rect = stack.pop()
-        midcorner = (
-                rect[0][0] + 2/3. * (rect[1][0] - rect[0][0]),
-                1/3. * (rect[2][1] - 0*rect[1][1]))
-        poly1 = [rect[0], midcorner, rect[2], rect[3]]
-        poly2 = [rect[0], rect[1], rect[2], midcorner]
-        return stack + [poly1, poly2]
-
-class bl_arc:
-    # expects a rect in the stack
-    # outputs the corner first, then the major part
-    def __call__(self, stack):
-        # midpoint is 1/3 from the nearest corner, roughly
-        rect = stack.pop()
-        midcorner = (
-                rect[0][0] + 1/3. * (rect[2][0] - rect[0][0]),
-                rect[0][1] + 2/3. * (rect[2][1] - rect[0][1])
-        )
-        poly1 = [rect[0], midcorner, rect[2], rect[3]]
-        poly2 = [rect[0], rect[1], rect[2], midcorner]
-        return stack + [poly1, poly2]
-
-class br_arc:
-    # expects a rect in the stack
-    # outputs the major part first
-    def __call__(self, stack):
-        # midpoint is 1/3 from the nearest corner, roughly
-        rect = stack.pop()
-        midcorner = (
-                rect[3][0] + 2/3. * (rect[2][0] - rect[3][0]),
-                rect[1][1] + 2/3. * (rect[2][1] - rect[1][1])
-        )
-        major = [rect[0], rect[1], midcorner, rect[3]]
-        corner = [midcorner, rect[1], rect[2], rect[3]]
+        quad = stack.pop()
+        midvert = (
+                quad[0][0] + 2/3. * (quad[1][0] - quad[0][0]),
+                1/3. * (quad[2][1] - 0*quad[1][1]))
+        major = [quad[0], midvert, quad[2], quad[3]]
+        corner = [quad[0], quad[1], quad[2], midvert]
         return stack + [major, corner]
 
-class r_arcs:
-    # expects a rect in the stack
+class bl_arc:
+    """Split a quad into bottom-left corner and remaining major part"""
     def __call__(self, stack):
-        rect = stack.pop()
+        # midpoint is 1/3 from the nearest corner, roughly
+        quad = stack.pop()
+        midvert = (
+                quad[0][0] + 1/3. * (quad[2][0] - quad[0][0]),
+                quad[0][1] + 2/3. * (quad[2][1] - quad[0][1])
+        )
+        corner = [quad[0], midvert, quad[2], quad[3]]
+        major = [quad[0], quad[1], quad[2], midvert]
+        return stack + [corner, major]
+
+class br_arc:
+    """Split a quad into remaining major part and bottom-right corner"""
+    def __call__(self, stack):
+        # midpoint is 1/3 from the nearest corner, roughly
+        quad = stack.pop()
+        midvert = (
+                quad[3][0] + 2/3. * (quad[2][0] - quad[3][0]),
+                quad[1][1] + 2/3. * (quad[2][1] - quad[1][1])
+        )
+        major = [quad[0], quad[1], midvert, quad[3]]
+        corner = [midvert, quad[1], quad[2], quad[3]]
+        return stack + [major, corner]
+
+# (there is no left equivalent although the complex g is similar)
+class r_arcs:
+    """Split a quad into remaining major part and top and bottom right corners"""
+    def __call__(self, stack):
+        quad = stack.pop()
         topmid = (
-                (rect[0][0] + rect[1][0]) / 2,
-                rect[0][1]
+                (quad[0][0] + quad[1][0]) / 2,
+                quad[0][1]
         )
         botmid = (
-                (rect[2][0] + rect[3][0]) / 2,
-                rect[2][1]
+                (quad[2][0] + quad[3][0]) / 2,
+                quad[2][1]
         )
         midmid = (
-                rect[1][0],
-                (rect[1][1] + rect[2][1]) / 2
+                quad[1][0],
+                (quad[1][1] + quad[2][1]) / 2
         )
-        majorpoly = [rect[0], topmid, midmid, botmid, rect[3]]
-        topcorner = [topmid, rect[1], midmid]
-        botcorner = [midmid, rect[2], botmid]
+        majorpoly = [quad[0], topmid, midmid, botmid, quad[3]]
+        topcorner = [topmid, quad[1], midmid]
+        botcorner = [midmid, quad[2], botmid]
         return stack + [majorpoly, topcorner, botcorner]
 
-# top box of two /-slashed boxes
+class slash:
+    """Split a box into left and right /-slashed triangles"""
+    def __call__(self, stack):
+        quad = stack.pop()
+        left = [quad[0], quad[1], quad[3]]
+        right = [quad[1], quad[2], quad[3]]
+        return stack + [left, right]
+
+class bslash:
+    """Split a box into left and right \-slashed triangles"""
+    def __call__(self, stack):
+        quad = stack.pop()
+        left = [quad[0], quad[2], quad[3]]
+        right = [quad[0], quad[1], quad[2]]
+        return stack + [left, right]
+
 class top_slash:
-    # expects a rectangular-ish poly in the stack
+    """Split a top of two /-together boxes into big and small bits"""
     def __call__(self, stack):
-        rect = stack.pop()
-        # measured from base so that this works with top-arced
-        mx = (rect[2][0] + rect[3][0]) / 2
-        midcorner = (mx, rect[2][1])
-        poly1 = [rect[0], rect[1], midcorner, rect[3]]
-        poly2 = [rect[1], rect[2], midcorner]
-        return stack + [poly1, poly2]
+        quad = stack.pop()
+        midvert = (
+                (quad[2][0] + quad[3][0]) / 2,
+                quad[2][1]
+        )
+        big = [quad[0], quad[1], midvert, quad[3]]
+        small = [quad[1], quad[2], midvert]
+        return stack + [big, small]
 
-# bottom box of two /-slashed boxes
 class bot_slash:
-    # expects a rectangular-ish poly in the stack
-    # puts the left-facing triangle part first, then the right-facing big
+    """Split a bottom of two /-together boxes into small and big bits"""
     def __call__(self, stack):
-        rect = stack.pop()
-        # measured from top as that's where the line end is
-        mx = (rect[1][0] + rect[0][0]) / 2
-        midcorner = (mx, rect[0][1])
-        poly1 = [rect[0], midcorner, rect[3]]
-        poly2 = [(mx, rect[0][1]), rect[1], rect[2], rect[3]]
-        return stack + [poly1, poly2]
+        quad = stack.pop()
+        midvert = (
+                (quad[1][0] + quad[0][0]) / 2,
+                quad[0][1]
+        )
+        small = [quad[0], midvert, quad[3]]
+        big = [midvert, quad[1], quad[2], quad[3]]
+        return stack + [small, big]
 
-# top box of two \-lashed boxes
 class top_bslash:
-    # expects a rectangular-ish poly in the stack
-    # puts the left-facing triangle part first, then the right-facing big
+    """Split a top of two \-together boxes into small and big bits"""
     def __call__(self, stack):
-        rect = stack.pop()
-        # measured from base
-        mx = (rect[2][0] + rect[3][0]) / 2
-        midcorner = (mx, rect[2][1])
-        poly1 = [rect[0], midcorner, rect[3]]
-        poly2 = [rect[0], rect[1], rect[2], midcorner]
-        return stack + [poly1, poly2]
+        quad = stack.pop()
+        midvert = (
+                (quad[2][0] + quad[3][0]) / 2,
+                quad[2][1]
+        )
+        small = [quad[0], midvert, quad[3]]
+        big = [quad[0], quad[1], quad[2], midvert]
+        return stack + [small, big]
 
-# bottom box of two \-lashed boxes
 class bot_bslash:
-    # expects a rectangular-ish poly in the stack
+    """Split a bottom of two \-together boxes into big and small bits"""
     def __call__(self, stack):
-        rect = stack.pop()
-        # measured from top
-        mx = (rect[1][0] + rect[0][0]) / 2
-        midcorner = (mx, rect[1][1])
-        poly1 = [rect[0], midcorner, rect[2], rect[3]]
-        poly2 = [midcorner, rect[1], rect[2]]
-        return stack + [poly1, poly2]
+        quad = stack.pop()
+        midvert = (
+                (quad[1][0] + quad[0][0]) / 2,
+                quad[1][1]
+        )
+        big = [quad[0], midvert, quad[2], quad[3]]
+        small = [midvert, quad[1], quad[2]]
+        return stack + [big, small]
         # see e.g. h5, h4, h6
 
-# XXX just for early development
 class dup:
+    """Duplicate the top polygon of the stack"""
     def __call__(self, stack):
         top = stack.pop()
         return stack + [top, top]
 
 class swap:
+    """Swap the top two elements together"""
     def __call__(self, stack):
         top = stack.pop()
         next = stack.pop()
         return stack + [top, next]
 
-class rot:
-    """third item to the top"""
+class rot3:
+    """Bring the third item to the top"""
     def __call__(self, stack):
         a = stack.pop()
         b = stack.pop()
         c = stack.pop()
         return stack + [b, a, c]
 
-class rotate:
-    """first item to the top"""
+class rotall:
+    """Bring the bottom item to the top"""
     def __call__(self, stack):
         oldest = stack[0]
         return stack[1:] + [oldest]
 
-class lotate:
-    """topmost item to the bottom"""
-    def __call__(self, stack):
-        top = stack.pop()
-        return [top] + stack
-
-class slash:
-    # expects a rectangular-ish poly in the stack
-    def __call__(self, stack):
-        rect = stack.pop()
-        poly1 = [rect[0], rect[1], rect[3]]
-        poly2 = [rect[1], rect[2], rect[3]]
-        return stack + [poly1, poly2]
-
-class bslash:
-    # expects a rectangular-ish poly in the stack
-    def __call__(self, stack):
-        rect = stack.pop()
-        poly1 = [rect[0], rect[2], rect[3]]
-        poly2 = [rect[0], rect[1], rect[2]]
-        return stack + [poly1, poly2]
-
 class nop:
-    """Specify to draw nothing"""
+    """Emit an empty object"""
     def __call__(self, stack):
         return stack + [[]]
 
@@ -295,14 +300,9 @@ class nop:
 
 # these clauses must match the exact segment order in the pixel map
 # (see e.g. h5, h4, h6 or g5, g4, g3, g2, g1)
-GFX_LANGUAGE = [
+GFX_PROGRAMS = [
     # top row is special, treated elsewhere
-    # 0
-    [],
-    [],
-    [],
-    [],
-    [],
+    # 0 is nothing
 
     # 1
     [full, tl_arc],
@@ -319,14 +319,14 @@ GFX_LANGUAGE = [
     [full, top_slash],
 
     # 3
-    [full, bot_bslash, swap, tl_arc, rot],
+    [full, bot_bslash, swap, tl_arc, rot3],
     [half, slash],
     [full, top_bslash, slash], # triangle on its corner
     [half],
     [full, bot_slash, tr_arc],
 
     # 4
-    [full, top_slash, swap, bl_arc, rot],
+    [full, top_slash, swap, bl_arc, rot3],
     [half, bslash],
     [full, bot_slash, bslash], # triangle on its base
     [half, slash],
@@ -345,7 +345,7 @@ GFX_LANGUAGE = [
     # exec: full => full; bot_slash => small, big; swap => big, small;
     #       dup => big, small, small; dup => big, small, small, small;
     #       final == small small small big nop (g5 g4 g3 g2 g1)
-    [full, bot_slash, swap, dup, dup, rotate, nop],
+    [full, bot_slash, swap, dup, dup, rotall, nop],
     [half, slash],
     [full, top_bslash, slash], # triangle on its corner
     [half, bslash],
@@ -387,246 +387,84 @@ GFX_LANGUAGE = [
 ]
 
 def run_pure_program(prog):
+    """Run a pixel splitting program, return completed stack"""
     stack = []
     for x in prog:
+        # could live with just functions for now, but this is future-proof
         stack = x()(stack)
     return stack
 
-def emit_polygons(screen, x, y, j, polygons):
-    x += OFFX
-    y += OFFY
-    for (i, poly) in enumerate(polygons):
-        if i == j and len(poly) != 0:
-            points = [(SCALE*(x + px), SCALE*(y + py)) for (px, py) in poly]
-            pygame.gfxdraw.filled_polygon(screen, points, COLOR_SEG)
-            pygame.gfxdraw.polygon(screen, points, COLOR_SEG_BORDER)
+def emit_polygon(screen, x, y, j, polygons):
+    """Render a segment in an area specified in PIXEL_MAP"""
+    poly = polygons[j]
+    if len(poly) != 0:
+        points = [(SCALE*(x + px), SCALE*(y + py)) for (px, py) in poly]
+        pygame.gfxdraw.filled_polygon(screen, points, COLOR_SEG)
+        pygame.gfxdraw.polygon(screen, points, COLOR_SEG_BORDER)
 
-def run_toprow(screen, posx, posy, x, y, j):
-    # j is always 0 here, and TOP_POLYS is special. x varies though
-    emit_polygons(screen, posx, -dots_yminus + posy, x, TOP_POLYS)
+def run_toprow(screen, base_x, base_y, x, j):
+    """Emit top row segment"""
+    # j is always 0 here, and TOP_POLYS is indexed by x, not j
+    emit_polygon(screen, base_x, base_y, x, TOP_POLYS)
 
-def run_render_program(screen, posx, posy, x, y, j, prog):
-    if y == 0:
-        # special top row won't happen here
-        raise ValueError("nope")
-    else:
-        xoffs = [0, fw, fw+hw, fw+hw+fw, fw+hw+fw+hw]
-        x = xoffs[x] + x * pad
-        y -= 1
-        y *= (h + pad)
+def run_render_program(screen, base_x, base_y, x, y, j, prog):
+    """Emit bottom row segment from a program generating its box"""
+    xoffs = [0, fw, fw+hw, fw+hw+fw, fw+hw+fw+hw]
+    x = xoffs[x] + x * pad
+    y *= h + pad
     polygons = run_pure_program(prog)
-    emit_polygons(screen, x + posx, y + posy, j, polygons)
+    emit_polygon(screen, x + base_x, dots_yminus + y + base_y, j, polygons)
 
-def render(screen, posx, posy, glyphdata):
-    pixel_invmap = {}
+def render(screen, base_x, base_y, glyphdata):
+    """Render a glyph to screen at (base_x, base_y)"""
+    # note: some are padding bits and are left as None
+    pixel_invmap = [None] * pixel_map.TOTAL_DIGIT_BITS
     for (i, pixel) in enumerate(pixel_map.PIXEL_MAP):
-        x = i % 5
-        y = i // 5
-        for (j, segment_spec) in enumerate(pixel):
-            offset_in_digit = pixel_map.BITS_PER_LABEL * segment_spec[0] + segment_spec[1]
+        x = i % pixel_map.W
+        y = i // pixel_map.W
+        for (j, seg_spec) in enumerate(pixel):
+            offset_in_digit = pixel_map.BITS_PER_LABEL * seg_spec[0] + seg_spec[1]
             segment = pixel_map.TOTAL_DIGIT_BITS - 1 - offset_in_digit
             pixel_invmap[segment] = (x, y, j)
 
     # TODO precompute the above and prerender these
-    for (i, bit) in enumerate(glyphdata):
+    for (i, (bit, inv)) in enumerate(zip(glyphdata, pixel_invmap)):
         if not bit:
             continue
-        (x, y, j) = pixel_invmap[i]
+        (x, y, j) = inv
 
         # just double check
-        segment_spec = pixel_map.PIXEL_MAP[5 * y + x][j]
-        offset_in_digit = pixel_map.BITS_PER_LABEL * segment_spec[0] + segment_spec[1]
+        seg_spec = pixel_map.PIXEL_MAP[pixel_map.W * y + x][j]
+        offset_in_digit = pixel_map.BITS_PER_LABEL * seg_spec[0] + seg_spec[1]
         segment = pixel_map.TOTAL_DIGIT_BITS - 1 - offset_in_digit
         assert segment == i
 
         if y == 0:
-            run_toprow(screen, posx, posy, x, y, j)
+            run_toprow(screen, base_x, base_y, x, j)
         else:
-            render_program = GFX_LANGUAGE[y * 5 + x]
-            run_render_program(screen, posx, posy, x, y, j, render_program)
+            render_program = GFX_PROGRAMS[(y - 1) * pixel_map.W + x]
+            run_render_program(screen, base_x, base_y, x, y - 1, j, render_program)
+
+def flatten_once(lst):
+    """[[a, b], [c, d]] -> [a, b, c, d]"""
+    for a in lst:
+        for b in a:
+            yield b
 
 def testglyph():
-    data = [0] * 120
+    """Unit test stuff for early development"""
+    data = [0] * pixel_map.TOTAL_DIGIT_BITS
+    # note: this validation was built up one by one with GFX_PROGRAMS
     (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) = range(15)
-    # note: this validation was built up one by one with GFX_LANGUAGE
-    light_up = [
-        # row 0, the special one
-        (j, 0),
-        (j, 5),
-        (j, 6),
-        (j, 7),
-        (k, 6),
-
-        # row 1
-        (i, 4),
-        (i, 5),
-
-        (j, 1),
-
-        (j, 4),
-        (k, 0),
-        (k, 2),
-
-        (k, 5),
-
-        (l, 1),
-        (l, 2),
-
-        # row 2
-        (i, 0),
-        (i, 1),
-
-        (i, 2),
-        (i, 7),
-
-        (j, 3),
-        (k, 1),
-
-        (k, 7),
-        (l, 4),
-
-        (l, 5),
-        (l, 7),
-
-        # row 3
-        (h, 5),
-        (h, 4),
-        (h, 6),
-
-        (h, 7),
-        (i, 3),
-
-        (j, 2),
-        (k, 3),
-        (l, 0),
-
-        (l, 6),
-
-        (m, 0),
-        (m, 3),
-        (m, 2),
-
-        # row 4
-        (h, 0),
-        (h, 1),
-        (g, 7),
-
-        (h, 2),
-        (h, 3),
-
-        (i, 6),
-        (k, 4),
-        (l, 3),
-
-        (m, 1),
-        (m, 5),
-
-        (m, 7),
-        (m, 6),
-        (n, 0),
-
-        # row 5
-        (g, 5),
-        (g, 4),
-        (g, 3),
-        (g, 2),
-        (g, 1),
-
-        (g, 6),
-        (g, 0),
-
-        (d, 1),
-        (m, 4),
-        (n, 6),
-
-        (n, 1),
-        (n, 2),
-
-        (n, 4),
-        (n, 3),
-        (n, 5),
-
-        # row 6
-        (f, 5),
-        (f, 6),
-        (f, 4),
-
-        (f, 3),
-        (f, 7),
-
-        (e, 0),
-        (b, 0),
-        (a, 5),
-
-        (n, 7),
-        (o, 3),
-
-        (o, 1),
-        (o, 0),
-        (o, 2),
-
-        # row 7
-        (e, 6),
-        (e, 5),
-        (e, 4),
-
-        (e, 3),
-        (d, 7),
-
-        (d, 0),
-        (c, 1),
-        (b, 7),
-
-        (b, 1),
-        (a, 4),
-
-        (a, 1),
-        (a, 3),
-        (a, 2),
-
-        # row 8
-        (e, 1),
-        (e, 2),
-
-        (d, 5),
-        (d, 4),
-
-        (c, 6),
-        (c, 2),
-
-        (b, 4),
-        (b, 3),
-
-        (a, 6),
-        (a, 7),
-
-        # row 9
-        (d, 6),
-
-        (c, 5),
-
-        (b, 2),
-
-        # row 10
-        (d, 3),
-        (d, 2),
-
-        (c, 7),
-
-        (c, 4),
-        (c, 3),
-
-        (c, 0),
-
-        (b, 6),
-        (b, 5),
-    ]
+    # or do manual list indices like [(j, 0), (i, 4), (i, 5), ... ]
+    light_up = flatten_once(pixel_map.PIXEL_MAP)
 
     for (a, b) in light_up:
         data[-1 - (8 * a + b)] = 1
     return data
 
 def render_glyph(screen, x, y, font, glyph):
+    """Render a glyph code from a font to screen, top left at (x, y)"""
     # special g variation histogram:
     #   2    g2    g4 g5 = bottom left arc (s, ŝ)
     #   4 g1 g2          = angled up right (§, 4, %., §)
@@ -660,23 +498,29 @@ def render_glyph(screen, x, y, font, glyph):
         data = testglyph()
         render(screen, x, y, data)
 
-def main():
-    font = pixel_map.Font(sys.argv[1])
-    pygame.init()
-    screen = pygame.display.set_mode((1920, 1080))
-    fill = 127
-    screen.fill((fill, fill, fill))
-
-    per_row = 32
-    xgap = fw
-    ygap = h
-    for glyph in range(256):
-        x = glyph % per_row * (totw + xgap)
-        y = glyph // per_row * (toth + ygap)
-        pygame.gfxdraw.rectangle(screen,
-            pygame.Rect(SCALE*x, SCALE*y, SCALE*totw, SCALE*toth),
-            COLOR_DIGIT_BORDER)
+def render_array(screen, font, glyphs):
+    for (i, glyph) in enumerate(glyphs):
+        x = i % PER_ROW * (totw + DIGIT_GAP_W)
+        y = i // PER_ROW * (toth + DIGIT_GAP_H)
+        if render_regions:
+            pygame.gfxdraw.rectangle(screen,
+                pygame.Rect(SCALE*x, SCALE*y, SCALE*totw, SCALE*toth),
+                COLOR_DIGIT_BORDER)
         render_glyph(screen, x, y, font, glyph)
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode(CANVAS_SIZE)
+    screen.fill(COLOR_BACK)
+
+    font = pixel_map.Font(sys.argv[1])
+
+    if len(sys.argv) >= 3:
+        text = map(ord, " ".join(sys.argv[2:]))
+    else:
+        # draw them all by default
+        text = range(256)
+    render_array(screen, font, text)
 
     pygame.display.flip()
     pygame.event.pump()
