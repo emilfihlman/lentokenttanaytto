@@ -171,6 +171,7 @@ class Display:
     def __init__(self, port, panels=1):
         self.port = port
         self.panels = panels
+        self.prev_sent = 0
 
     def num_digits(self):
         return self.panels * DIGITS
@@ -179,6 +180,12 @@ class Display:
         return Window(self.panels)
 
     def blit(self, window):
+        tot = 0
+        while tot < self.prev_sent:
+            r = self.port.read(9999999)
+            tot += len(r)
+            #sleep(0.00001)
+
         compress = True
         if compress:
             bs = list(bitstring_to_bytestring_be(window.pixels))
@@ -189,12 +196,7 @@ class Display:
             nsent = self.port.write(bytes(window.pixels))
             assert nsent == len(window.pixels)
         self.port.flush()
-
-        tot = 0
-        while tot < nsent:
-            r = self.port.read(9999999)
-            tot += len(r)
-            sleep(0.0001)
+        self.prev_sent = nsent
 
 class Window:
     def __init__(self, panels=1):
