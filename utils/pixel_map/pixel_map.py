@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from time import sleep
+from time import sleep, time
 from serial import Serial
 from sys import argv
 
@@ -339,22 +339,21 @@ def explore_font(display, font):
 
     width = window.num_digits()
 
+    a = time()
+
     for glyph in range(-width + 1, 256 - width + 1):
         window = display.new_window()
         for digit in range(width):
             if glyph + digit >= 0:
                 font.render_glyph(window, digit, glyph + digit)
         display.blit(window)
-        if glyph < 20:
-            sleep(0.2)
-        if glyph < 40:
-            sleep(0.1)
-        elif glyph < 200:
-            sleep(0.01)
-        elif glyph < 220:
-            sleep(0.1)
-        else:
-            sleep(0.2)
+        #sleep(0.0001)
+
+    b = time()
+    d = b - a
+    bits = 256 * display.panels * DIGITS * BITS
+    print("%.2f kbits in %.2f seconds = %.2f kHz" % (
+        bits / 1000.0, d, bits / d / 1000.0))
 
     sleep(2)
 
@@ -363,8 +362,9 @@ def main():
     zel09101_fw_filename = argv[2]
     num_panels = int(argv[3])
 
-    #ser = Serial(argv[1], 230400, exclusive=True, timeout=0)
     ser = Serial(argv[1], 115200, exclusive=True, timeout=0)
+    # faster uart seems to be glitchy
+    #ser = Serial(argv[1], 230400, exclusive=True, timeout=0)
     sleep(2)
     r = ser.read(9999999)
     # wtf arduino
