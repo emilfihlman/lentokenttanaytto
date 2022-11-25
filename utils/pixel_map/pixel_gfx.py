@@ -127,12 +127,19 @@ class half:
 # FIXME all these arcs are approximated by just corners and midpoint,
 # looks good enough from afar but poor when zoomed in
 
+def acvect1d(a, b):
+    """arc-corner vect from a to b"""
+    return a + 0.3 * (b - a)
+
+def acvect(mid, end_hori, end_vert):
+    """arc-corner vect around a corner at mid"""
+    return (acvect1d(mid[0], end_hori[0]), acvect1d(mid[1], end_vert[1]))
+
 class tl_arc:
     """Split a quad into top-left corner and remaining major part"""
     def __call__(self, stack):
-        # midpoint is 1/3 from the nearest corner, roughly
         quad = stack.pop()
-        midvert = (1/3. * quad[1][0], 1/3. * quad[3][1])
+        midvert = acvect(quad[0], quad[1], quad[3])
         corner = [quad[0], quad[1], midvert, quad[3]]
         major = [midvert, quad[1], quad[2], quad[3]]
         return stack + [corner, major]
@@ -140,11 +147,8 @@ class tl_arc:
 class tr_arc:
     """Split a quad into remaining major part and top-right corner"""
     def __call__(self, stack):
-        # midpoint is 1/3 from the nearest corner, roughly
         quad = stack.pop()
-        midvert = (
-                quad[0][0] + 2/3. * (quad[1][0] - quad[0][0]),
-                1/3. * (quad[2][1] - 0*quad[1][1]))
+        midvert = acvect(quad[1], quad[0], quad[2])
         major = [quad[0], midvert, quad[2], quad[3]]
         corner = [quad[0], quad[1], quad[2], midvert]
         return stack + [major, corner]
@@ -152,12 +156,8 @@ class tr_arc:
 class bl_arc:
     """Split a quad into bottom-left corner and remaining major part"""
     def __call__(self, stack):
-        # midpoint is 1/3 from the nearest corner, roughly
         quad = stack.pop()
-        midvert = (
-                quad[0][0] + 1/3. * (quad[2][0] - quad[0][0]),
-                quad[0][1] + 2/3. * (quad[2][1] - quad[0][1])
-        )
+        midvert = acvect(quad[3], quad[2], quad[0])
         corner = [quad[0], midvert, quad[2], quad[3]]
         major = [quad[0], quad[1], quad[2], midvert]
         return stack + [corner, major]
@@ -165,12 +165,8 @@ class bl_arc:
 class br_arc:
     """Split a quad into remaining major part and bottom-right corner"""
     def __call__(self, stack):
-        # midpoint is 1/3 from the nearest corner, roughly
         quad = stack.pop()
-        midvert = (
-                quad[3][0] + 2/3. * (quad[2][0] - quad[3][0]),
-                quad[1][1] + 2/3. * (quad[2][1] - quad[1][1])
-        )
+        midvert = acvect(quad[2], quad[3], quad[1])
         major = [quad[0], quad[1], midvert, quad[3]]
         corner = [midvert, quad[1], quad[2], quad[3]]
         return stack + [major, corner]
