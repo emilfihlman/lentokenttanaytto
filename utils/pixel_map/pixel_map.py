@@ -369,8 +369,7 @@ def main():
     #ser = Serial(argv[1], 230400, exclusive=True, timeout=0)
     sleep(2)
     r = ser.read(9999999)
-    # wtf arduino
-    #print("flush size", len(r))
+    #print("flush size", len(r), r)
 
     font = Font(zel09101_fw_filename)
 

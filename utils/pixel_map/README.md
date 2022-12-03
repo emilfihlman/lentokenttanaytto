@@ -16,9 +16,3 @@ pixel gfx: Utility for segment render emulation with pygame.
 
 1. ./pixel\_gfx.py ../../rom/lentokenttanaytto\_zel09101.bin # for whole font data
 2. ./pixel\_gfx.py ../../rom/lentokenttanaytto\_zel09101.bin Hello world # for arbitrary text
-
-## Bugs
-
-Note that the proxy is panel count agnostic and latches data every 480 bits.
-This may cause some glitching with fast frame rate as the panel data chain displays once for each panel in series.
-This could be mitigated by teaching the proxy about the exact number of panels or by looping the last panel output back, but for now it's kept simple.
