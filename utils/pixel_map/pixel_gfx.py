@@ -13,6 +13,8 @@ hide_borders = False
 render_test_glyph = False
 # box around each digit for visualization
 render_regions = True
+# visualize some stack ops instead of drawing lcd data
+stack_debug_mode = False
 
 # guess what this is
 CANVAS_SIZE = (1920, 1080)
@@ -27,7 +29,10 @@ if hide_borders:
 # box around each digit for visualization
 COLOR_DIGIT_BORDER = (100, 0, 0)
 # digits for each row, determines digit size
-PER_ROW = 32
+if stack_debug_mode:
+    PER_ROW = 4
+else:
+    PER_ROW = 32
 
 # "full" and "half" width and height; rectangles in the normal region.
 # normal region goes full half full half full, with varying splits.
@@ -504,19 +509,59 @@ def render_array(screen, font, glyphs):
                 COLOR_DIGIT_BORDER)
         render_glyph(screen, x, y, font, glyph)
 
+def stack_debug_demo(screen):
+    programs = [
+        (hw, 1, [half]),
+        (hw, 2, [half, slash]),
+        (hw, 2, [half, bslash]),
+        (fw, 1, [full]),
+        (fw, 2, [full, tl_arc]),
+        (fw, 2, [full, tr_arc]),
+        (fw, 2, [full, bl_arc]),
+        (fw, 2, [full, br_arc]),
+        (fw, 2, [full, top_slash]),
+        (fw, 2, [full, bot_slash]),
+        (fw, 2, [full, top_bslash]),
+        (fw, 2, [full, bot_bslash]),
+        (fw, 3, [full, r_arcs]),
+        (fw, 3, [full, top_bslash, slash]), # triangle on its corner
+        (fw, 3, [full, bot_slash, bslash]), # triangle on its base
+        (fw, 3, [full, tl_arc, top_slash]),
+    ]
+    rows_per_column = 8
+    padx = fw
+    pady = h
+    colspacing = 4 * 1.5 * fw
+    for i, (w, npixels, prog) in enumerate(programs):
+        column = i // rows_per_column
+        basex = padx + column * colspacing
+        y = pady + (i % rows_per_column) * 1.5 * h
+        for j in range(1, 1 << npixels):
+            polygons = run_pure_program(prog)
+            x = basex + (j - 1) * 1.5 * w
+            for b in range(npixels):
+                if (j & (1 << b)) != 0:
+                    emit_polygon(screen, x, y, b, polygons)
+            pygame.gfxdraw.rectangle(screen,
+                pygame.Rect(SCALE*x, SCALE*y, SCALE*w, SCALE*h),
+                COLOR_DIGIT_BORDER)
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode(CANVAS_SIZE)
     screen.fill(COLOR_BACK)
 
-    font = pixel_map.Font(sys.argv[1])
-
-    if len(sys.argv) >= 3:
-        text = map(ord, " ".join(sys.argv[2:]))
+    if stack_debug_mode:
+        stack_debug_demo(screen)
     else:
-        # draw them all by default
-        text = range(256)
-    render_array(screen, font, text)
+        font = pixel_map.Font(sys.argv[1])
+
+        if len(sys.argv) >= 3:
+            text = map(ord, " ".join(sys.argv[2:]))
+        else:
+            # draw them all by default
+            text = range(256)
+        render_array(screen, font, text)
 
     pygame.display.flip()
     pygame.event.pump()
