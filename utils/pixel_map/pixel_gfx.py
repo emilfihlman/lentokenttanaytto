@@ -401,7 +401,7 @@ def emit_polygon(screen, x, y, j, polygons):
     if len(poly) != 0:
         points = [(SCALE*(x + px), SCALE*(y + py)) for (px, py) in poly]
         pygame.gfxdraw.filled_polygon(screen, points, COLOR_SEG)
-        pygame.gfxdraw.polygon(screen, points, COLOR_SEG_BORDER)
+        pygame.gfxdraw.aapolygon(screen, points, COLOR_SEG_BORDER)
 
 def run_toprow(screen, base_x, base_y, x, j):
     """Emit top row segment"""
