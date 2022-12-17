@@ -13,6 +13,9 @@ typedef uint64_t u64;
 
 #define F_CPU 16000000UL //16MHz clock
 
+#include <avr/io.h>
+//#include <avr/interrupt.h>
+
 #define UART_RX_PIN PIND0
 #define UART_TX_PIN PIND1
 
@@ -34,15 +37,10 @@ typedef uint64_t u64;
 //PB4	D12	SPI intput
 //PB5	D13	SPI clock
 
-#include <avr/io.h>
-//#include <avr/interrupt.h>
-#include <util/delay.h>
-
-
 /*
 ISR(USART_RX_vect)
 {
-	
+//...
 }
 */
 
