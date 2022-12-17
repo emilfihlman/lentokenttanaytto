@@ -24,6 +24,16 @@ typedef uint64_t u64;
 #define TIMER_FLICKER_PIN PINB1
 #define TIMER_LATCH_PIN PIND6
 
+//AVR	Arduino	Function
+//PD0	D0	UART RX / Serial
+//PD1	D1	UART TX / Serial
+//PD6	D6	Data latch
+//PB1	D9	LCD refresh
+//PB2	D10	Slave select must be output or shenanigans
+//PB3	D11	SPI output
+//PB4	D12	SPI intput
+//PB5	D13	SPI clock
+
 #include <avr/io.h>
 //#include <avr/interrupt.h>
 #include <util/delay.h>
